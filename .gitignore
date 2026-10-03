@@ -1,0 +1,23 @@
+# ===== Android / Gradle =====
+android/.gradle/
+android/**/build/
+android/local.properties
+android/.idea/
+android/*.iml
+
+# ===== Python =====
+server/.venv/
+server/__pycache__/
+server/**/*.pyc
+
+# ===== Secrets =====
+server/.env
+
+# ===== Server runtime data =====
+server/data/
+server/storage/
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+*.log
