@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.auth.device_router import router as device_router
 
 from app.auth.router import router as auth_router
 from app.config import settings
@@ -18,6 +19,7 @@ def startup() -> None:
 
 
 app.include_router(auth_router)
+app.include_router(device_router)
 
 
 @app.get("/api/health")
