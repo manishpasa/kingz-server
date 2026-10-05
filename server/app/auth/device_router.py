@@ -5,10 +5,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.device_schemas import (
+    BootstrapDeviceRequest,
     DeviceCreateRequest,
     DeviceResponse,
 )
-from app.auth.security import get_current_user
+from app.auth.security import get_current_user, hash_password, verify_password
 from app.database import get_db
 from app.models import Device, User
 
@@ -17,6 +18,80 @@ router = APIRouter(
     prefix="/api/devices",
     tags=["Devices"],
 )
+
+
+@router.post(
+    "/bootstrap",
+    response_model=DeviceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def bootstrap_first_device(
+    request: BootstrapDeviceRequest,
+    db: Session = Depends(get_db),
+):
+    username = request.username.strip()
+
+    user = db.scalar(
+        select(User).where(User.username == username)
+    )
+
+    if user is None or not verify_password(
+        request.password,
+        user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    authorized_device_exists = db.scalar(
+        select(Device).where(
+            Device.user_id == user.id,
+            Device.is_authorized.is_(True),
+        )
+    )
+
+    if authorized_device_exists is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An authorized device already exists",
+        )
+
+    existing_device = db.scalar(
+        select(Device).where(
+            Device.device_key == request.device_key
+        )
+    )
+
+    if existing_device is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This device key already exists",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    device = Device(
+        user_id=user.id,
+        device_key=request.device_key,
+        name=request.name.strip(),
+        platform=request.platform.strip(),
+        is_authorized=True,
+        created_at=now,
+        last_seen_at=now,
+    )
+
+    db.add(device)
+    db.commit()
+    db.refresh(device)
+
+    return device
 
 
 @router.post(
@@ -41,13 +116,15 @@ def register_device(
             detail="This device is already registered",
         )
 
+    now = datetime.now(timezone.utc)
+
     device = Device(
         user_id=current_user.id,
         device_key=request.device_key,
         name=request.name.strip(),
         platform=request.platform.strip(),
         is_authorized=True,
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=now,
     )
 
     db.add(device)
