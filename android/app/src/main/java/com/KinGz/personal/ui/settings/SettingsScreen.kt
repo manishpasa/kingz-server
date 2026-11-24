@@ -25,14 +25,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Switch
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,12 +55,19 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val store = remember { NoteSettingsStore(context) }
+    val store = androidx.compose.runtime.remember {
+        NoteSettingsStore(context)
+    }
 
-    var defaultColor by rememberSaveable { mutableStateOf(store.getDefaultColor()) }
-    var confirmTrash by rememberSaveable { mutableStateOf(store.getConfirmTrash()) }
-    var showTimestamps by rememberSaveable { mutableStateOf(store.getShowTimestamps()) }
-    var showAbout by rememberSaveable { mutableStateOf(false) }
+    var defaultColor by rememberSaveable {
+        mutableStateOf(store.getDefaultColor())
+    }
+    var confirmTrash by rememberSaveable {
+        mutableStateOf(store.getConfirmTrash())
+    }
+    var showTimestamps by rememberSaveable {
+        mutableStateOf(store.getShowTimestamps())
+    }
 
     BackHandler(onBack = onBack)
 
@@ -74,18 +77,28 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(top = 8.dp, bottom = 6.dp, start = 8.dp, end = 8.dp),
+                    .padding(
+                        top = 8.dp,
+                        bottom = 6.dp,
+                        start = 8.dp,
+                        end = 8.dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Back"
+                    )
                 }
+
                 Text(
                     "Settings",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
+
                 Icon(
                     Icons.Default.Settings,
                     contentDescription = null
@@ -107,6 +120,7 @@ fun SettingsScreen(
                 "Default note color",
                 fontWeight = FontWeight.SemiBold
             )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(
@@ -123,7 +137,11 @@ fun SettingsScreen(
                             .background(bg)
                             .border(
                                 if (key == defaultColor) 3.dp else 1.dp,
-                                if (key == defaultColor) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                if (key == defaultColor) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant
+                                },
                                 CircleShape
                             )
                             .clickable {
@@ -133,7 +151,11 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (key == defaultColor) {
-                            Text("✓", color = textColor, fontWeight = FontWeight.Bold)
+                            Text(
+                                "✓",
+                                color = textColor,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -160,45 +182,7 @@ fun SettingsScreen(
                     store.setShowTimestamps(it)
                 }
             )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            SettingsSectionTitle("App")
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("About KinGz", fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Personal Hub • local-first",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                TextButton(onClick = { showAbout = true }) {
-                    Text("View")
-                }
-            }
         }
-    }
-
-    if (showAbout) {
-        AlertDialog(
-            onDismissRequest = { showAbout = false },
-            title = { Text("KinGz Personal Hub") },
-            text = {
-                Text(
-                    "Your personal toolkit. Notes, tasks, money and data usage are designed to work locally on your device first."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showAbout = false }) { Text("Done") }
-            }
-        )
     }
 }
 
@@ -234,6 +218,10 @@ private fun SettingToggle(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
     }
 }

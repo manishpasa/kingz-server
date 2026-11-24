@@ -71,17 +71,24 @@ class TaskViewModel(
         if (task.title.isBlank()) return
 
         viewModelScope.launch {
-            taskDao.updateTask(
-                task.copy(
-                    title = task.title.trim(),
-                    description = task.description.trim()
-                )
+            val updatedTask = task.copy(
+                title = task.title.trim(),
+                description = task.description.trim()
             )
 
-            TaskReminderScheduler.schedule(
-                appContext,
-                task
-            )
+            taskDao.updateTask(updatedTask)
+
+            if (updatedTask.isCompleted) {
+                TaskReminderScheduler.cancel(
+                    appContext,
+                    updatedTask.id
+                )
+            } else {
+                TaskReminderScheduler.schedule(
+                    appContext,
+                    updatedTask
+                )
+            }
         }
     }
 

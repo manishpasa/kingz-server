@@ -1,3 +1,4 @@
+
 package com.KinGz.personal.data
 
 import android.content.Context
@@ -15,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MoneyTransfer::class,
         Debt::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,8 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    """
+                db.execSQL("""
                     CREATE TABLE IF NOT EXISTS money_transactions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         isIncome INTEGER NOT NULL,
@@ -44,16 +44,13 @@ abstract class AppDatabase : RoomDatabase() {
                         date INTEGER NOT NULL,
                         createdAt INTEGER NOT NULL
                     )
-                    """.trimIndent()
-                )
+                """.trimIndent())
             }
         }
 
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-
-                db.execSQL(
-                    """
+                db.execSQL("""
                     CREATE TABLE IF NOT EXISTS money_accounts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         name TEXT NOT NULL,
@@ -61,27 +58,21 @@ abstract class AppDatabase : RoomDatabase() {
                         isArchived INTEGER NOT NULL,
                         createdAt INTEGER NOT NULL
                     )
-                    """.trimIndent()
-                )
+                """.trimIndent())
 
-                db.execSQL(
-                    """
+                db.execSQL("""
                     INSERT OR IGNORE INTO money_accounts
                     (id, name, initialBalancePaisa, isArchived, createdAt)
                     VALUES
                     (1, 'Cash', 0, 0, strftime('%s','now') * 1000)
-                    """.trimIndent()
-                )
+                """.trimIndent())
 
-                db.execSQL(
-                    """
+                db.execSQL("""
                     ALTER TABLE money_transactions
                     ADD COLUMN accountId INTEGER NOT NULL DEFAULT 1
-                    """.trimIndent()
-                )
+                """.trimIndent())
 
-                db.execSQL(
-                    """
+                db.execSQL("""
                     CREATE TABLE IF NOT EXISTS money_transfers (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         fromAccountId INTEGER NOT NULL,
@@ -91,11 +82,9 @@ abstract class AppDatabase : RoomDatabase() {
                         date INTEGER NOT NULL,
                         createdAt INTEGER NOT NULL
                     )
-                    """.trimIndent()
-                )
+                """.trimIndent())
 
-                db.execSQL(
-                    """
+                db.execSQL("""
                     CREATE TABLE IF NOT EXISTS money_debts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         person TEXT NOT NULL,
@@ -106,11 +95,26 @@ abstract class AppDatabase : RoomDatabase() {
                         isSettled INTEGER NOT NULL,
                         createdAt INTEGER NOT NULL
                     )
-                    """.trimIndent()
-                )
+                """.trimIndent())
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    ALTER TABLE money_transactions
+                    ADD COLUMN debtId INTEGER
+                """.trimIndent())
+            }
+        }
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+            ALTER TABLE money_accounts
+            ADD COLUMN excludeFromTotal INTEGER NOT NULL DEFAULT 0
+        """.trimIndent())
+            }
+        }
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
@@ -120,7 +124,9 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_1_2,
-                        MIGRATION_2_3
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5
                     )
                     .build()
                     .also { INSTANCE = it }

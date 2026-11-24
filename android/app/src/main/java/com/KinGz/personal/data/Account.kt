@@ -1,3 +1,4 @@
+
 package com.KinGz.personal.data
 
 import androidx.room.Entity
@@ -10,5 +11,6 @@ data class Account(
     val name: String,
     val initialBalancePaisa: Long = 0L,
     val isArchived: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val excludeFromTotal: Boolean = false
 )

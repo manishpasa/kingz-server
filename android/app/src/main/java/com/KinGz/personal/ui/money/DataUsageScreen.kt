@@ -1,5 +1,5 @@
 package com.KinGz.personal.ui.datausage
-
+import androidx.compose.foundation.layout.statusBarsPadding
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.widget.Toast
@@ -219,10 +219,11 @@ private fun DataUsageTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .statusBarsPadding()
             .padding(
                 start = 8.dp,
-                end = 8.dp,
-                top = 8.dp,
+                end = 16.dp,
+                top = 12.dp,
                 bottom = 8.dp
             ),
         verticalAlignment = Alignment.CenterVertically

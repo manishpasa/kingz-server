@@ -1,3 +1,4 @@
+
 package com.KinGz.personal.data
 
 import androidx.room.Dao
@@ -21,4 +22,10 @@ interface MoneyTransferDao {
 
     @Delete
     suspend fun deleteTransfer(transfer: MoneyTransfer)
+
+    @Query("""
+        SELECT COUNT(*) FROM money_transfers
+        WHERE fromAccountId = :accountId OR toAccountId = :accountId
+    """)
+    suspend fun countTransfersForAccount(accountId: Long): Int
 }

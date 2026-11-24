@@ -1,9 +1,7 @@
 package com.KinGz.personal.ui.money
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -65,7 +63,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
+import androidx.compose.material3.Checkbox
 private enum class TransactionFilter {
     ALL,
     INCOME,
@@ -100,11 +98,14 @@ fun MoneyScreen(
     val accounts by viewModel.accounts.collectAsState()
     val transfers by viewModel.transfers.collectAsState()
     val debts by viewModel.debts.collectAsState()
+    val protectedSavings by viewModel.emergencyFundPaisa.collectAsState()
+    val savingsSourceAccountId by viewModel.savingsSourceAccountId.collectAsState()
 
     var selectedAccountId by remember { mutableStateOf<Long?>(null) }
     var showAccounts by remember { mutableStateOf(false) }
     var showDebts by remember { mutableStateOf(false) }
-    var showTransfers by remember { mutableStateOf(false) }
+    var showTransfers by remember { mutableStateOf(true) }
+    var showSavings by remember { mutableStateOf(true) }
 
     var searchQuery by remember { mutableStateOf("") }
     var transactionFilter by remember { mutableStateOf(TransactionFilter.ALL) }
@@ -114,7 +115,8 @@ fun MoneyScreen(
 
     var showAccountDialog by remember { mutableStateOf(false) }
     var editingAccount by remember { mutableStateOf<Account?>(null) }
-
+    var deletingAccount by remember { mutableStateOf<Account?>(null) }
+    var accountDeleteMessage by remember { mutableStateOf<String?>(null) }
     var showTransactionDialog by remember { mutableStateOf(false) }
     var editingTransaction by remember { mutableStateOf<MoneyTransaction?>(null) }
     var deletingTransaction by remember { mutableStateOf<MoneyTransaction?>(null) }
@@ -124,6 +126,7 @@ fun MoneyScreen(
     var deletingTransfer by remember { mutableStateOf<MoneyTransfer?>(null) }
 
     var showDebtDialog by remember { mutableStateOf(false) }
+    var showSavingsDialog by remember { mutableStateOf(false) }
     var editingDebt by remember { mutableStateOf<Debt?>(null) }
     var deletingDebt by remember { mutableStateOf<Debt?>(null) }
     var settlingDebt by remember { mutableStateOf<Debt?>(null) }
@@ -138,7 +141,10 @@ fun MoneyScreen(
         }
     }
 
-    val totalBalance = accountBalances.values.sum()
+    val totalBalance = accounts
+        .filter { !it.excludeFromTotal }
+        .sumOf { accountBalances[it.id] ?: 0L }
+
     val accountScopedTransactions = transactions.filter {
         selectedAccountId == null || it.accountId == selectedAccountId
     }
@@ -234,7 +240,16 @@ fun MoneyScreen(
         .sumOf { it.amountPaisa }
 
     val netPeopleBalance = owedToMe - iOwe
-    val personalTotalBalance = totalBalance + netPeopleBalance
+
+    val displayedCash = if (selectedAccountId == null) {
+        totalBalance
+    } else {
+        accountBalances[selectedAccountId] ?: 0L
+    }
+
+    val totalMoney = totalBalance + owedToMe - iOwe
+    val availableToSpend = (totalBalance - iOwe - protectedSavings).coerceAtLeast(0L)
+
     Scaffold(
         topBar = {
             Row(
@@ -244,7 +259,7 @@ fun MoneyScreen(
                     .padding(
                         start = 8.dp,
                         end = 16.dp,
-                        top = 8.dp,
+                        top = 12.dp,
                         bottom = 8.dp
                     ),
                 verticalAlignment = Alignment.CenterVertically
@@ -306,24 +321,21 @@ fun MoneyScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                BalanceCardV3(
-                    displayedBalance =
-                        if (selectedAccountId == null) {
-                            personalTotalBalance
-                        } else {
-                            accountBalances[selectedAccountId] ?: 0L
-                        },
+                BalanceCardV4(
+                    displayedCash = displayedCash,
                     selectedAccount = accounts.firstOrNull {
                         it.id == selectedAccountId
                     },
+                    totalMoney = totalMoney,
+                    availableToSpend = availableToSpend,
+                    protectedSavings = protectedSavings,
+                    owedToMe = owedToMe,
+                    iOwe = iOwe,
                     monthIncome = monthIncome,
                     monthExpense = monthExpense,
                     monthNet = monthNet,
                     todayIncome = todayIncome,
                     todayExpense = todayExpense,
-                    accountTotalBalance = totalBalance,
-                    owedToMe = owedToMe,
-                    iOwe = iOwe,
                     onToggleAccounts = {
                         showAccounts = !showAccounts
                     }
@@ -369,85 +381,60 @@ fun MoneyScreen(
                 item {
                     SectionHeaderV3(
                         title = "Accounts",
-                        actionText = if (showAccounts) "Hide" else "Show",
+                        actionText = "Add account",
                         onAction = {
-                            showAccounts = !showAccounts
+                            editingAccount = null
+                            showAccountDialog = true
                         }
                     )
-
                 }
-                if (showAccounts) {
 
-                    item {
-                        OutlinedButton(
-                            onClick = {
-                                editingAccount = null
-                                showAccountDialog = true
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null
-                            )
-
-                            Spacer(modifier = Modifier.width(6.dp))
-
-                            Text("Add account")
-                        }
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = {
-                                selectedAccountId = null
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                if (selectedAccountId == null) {
-                                    "✓ All accounts"
-                                } else {
-                                    "Show all accounts"
-                                }
-                            )
-                        }
-                    }
-
-                    itemsIndexed(
-                        items = accounts,
-                        key = { index, account ->
-                            "account_${account.id}_$index"
-                        }
-                    ) { _, account ->
-                        AccountCardV3(
-                            account = account,
-                            balance = accountBalances[account.id]
-                                ?: account.initialBalancePaisa,
-                            selected = selectedAccountId == account.id,
-                            transactionCount = transactions.count {
-                                it.accountId == account.id
-                            },
-                            onSelect = {
-                                selectedAccountId = account.id
-                            },
-                            onEdit = {
-                                editingAccount = account
-                                showAccountDialog = true
+                item {
+                    OutlinedButton(
+                        onClick = { selectedAccountId = null },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (selectedAccountId == null) {
+                                "✓ All accounts"
+                            } else {
+                                "Show all accounts"
                             }
                         )
                     }
                 }
 
+                items(
+                    items = accounts,
+                    key = { "account_${it.id}" }
+                ) { account ->
+                    AccountCardV3(
+                        account = account,
+                        balance = accountBalances[account.id]
+                            ?: account.initialBalancePaisa,
+                        selected = selectedAccountId == account.id,
+                        transactionCount = transactions.count {
+                            it.accountId == account.id
+                        },
+                        onSelect = {
+                            selectedAccountId = account.id
+                        },
+                        onEdit = {
+                            editingAccount = account
+                            showAccountDialog = true
+                        },
+                        onDelete = {
+                            deletingAccount = account
+                        }
+                    )
+                }
             }
 
             item {
                 SectionHeaderV3(
                     title = "People / Owes",
                     actionText = if (showDebts) "Hide" else "Show",
-                    onAction = {
-                        showDebts = !showDebts
-                    }
+                    onAction = { showDebts = !showDebts }
                 )
             }
 
@@ -468,8 +455,11 @@ fun MoneyScreen(
                     items = openDebts,
                     key = { "debt_${it.id}" }
                 ) { debt ->
-                    DebtCardV3(
+                    DebtCardV4(
                         debt = debt,
+                        sourceAccountName = accounts.firstOrNull {
+                            it.id == debtSourceAccountId(debt.note)
+                        }?.name,
                         onEdit = {
                             editingDebt = debt
                             showDebtDialog = true
@@ -483,7 +473,6 @@ fun MoneyScreen(
                     )
                 }
             }
-
             item {
                 SectionHeaderV3(
                     title = "Transactions",
@@ -581,7 +570,7 @@ fun MoneyScreen(
     }
 
     if (showActionDialog) {
-        ActionChoiceDialogV3(
+        ActionChoiceDialogV4(
             onDismiss = { showActionDialog = false },
             onTransaction = {
                 showActionDialog = false
@@ -602,6 +591,10 @@ fun MoneyScreen(
                 showActionDialog = false
                 editingAccount = null
                 showAccountDialog = true
+            },
+            onSavings = {
+                showActionDialog = false
+                showSavingsDialog = true
             }
         )
     }
@@ -685,7 +678,8 @@ fun MoneyScreen(
     }
 
     if (showDebtDialog) {
-        DebtDialogV3(
+        DebtDialogV4(
+            accounts = accounts,
             initial = editingDebt,
             onDismiss = {
                 showDebtDialog = false
@@ -693,42 +687,31 @@ fun MoneyScreen(
             },
             onSave = { debt ->
                 if (editingDebt == null) {
-                    val existingDebt = openDebts
-                        .filter {
-                            it.isOwedToMe == debt.isOwedToMe &&
-                                    it.person.equals(debt.person.trim(), ignoreCase = true)
-                        }
-                        .maxByOrNull { it.date }
-
-                    if (existingDebt != null) {
-                        val combinedNote = when {
-                            existingDebt.note.isBlank() -> debt.note.trim()
-                            debt.note.isBlank() -> existingDebt.note
-                            else -> existingDebt.note + " • " + debt.note.trim()
-                        }
-
-                        viewModel.updateDebt(
-                            existingDebt.copy(
-                                amountPaisa = existingDebt.amountPaisa + debt.amountPaisa,
-                                note = combinedNote,
-                                date = debt.date,
-                                isSettled = false
-                            )
-                        )
-                    } else {
-                        viewModel.addDebt(
-                            person = debt.person,
-                            amountPaisa = debt.amountPaisa,
-                            isOwedToMe = debt.isOwedToMe,
-                            note = debt.note,
-                            date = debt.date
-                        )
-                    }
+                    viewModel.addDebt(
+                        person = debt.person,
+                        amountPaisa = debt.amountPaisa,
+                        isOwedToMe = debt.isOwedToMe,
+                        note = debt.note,
+                        date = debt.date
+                    )
                 } else {
                     viewModel.updateDebt(debt)
                 }
                 showDebtDialog = false
                 editingDebt = null
+            }
+        )
+    }
+
+    if (showSavingsDialog) {
+        SavingsDialogV4(
+            accounts = accounts,
+            initialAmountPaisa = protectedSavings,
+            initialSourceAccountId = savingsSourceAccountId,
+            onDismiss = { showSavingsDialog = false },
+            onSave = { amountPaisa, sourceAccountId ->
+                viewModel.setProtectedSavings(amountPaisa, sourceAccountId)
+                showSavingsDialog = false
             }
         )
     }
@@ -743,7 +726,77 @@ fun MoneyScreen(
             }
         )
     }
+    deletingAccount?.let { account ->
+        AlertDialog(
+            onDismissRequest = {
+                deletingAccount = null
+            },
+            title = {
+                Text("Remove account?")
+            },
+            text = {
+                Text(
+                    "Remove '${account.name}'?\n\n" +
+                            "The account must have a zero balance, and protected savings must be moved or removed first.\n\n" +
+                            "If financial history exists, the account will be archived to preserve its records. Otherwise, it will be permanently deleted."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteAccount(account) { message ->
+                            accountDeleteMessage = message
 
+                            if (
+                                message == "Account archived. Financial history has been preserved." ||
+                                message == "Account permanently deleted."
+                            ) {
+                                if (selectedAccountId == account.id) {
+                                    selectedAccountId = null
+                                }
+                            }
+                        }
+
+                        deletingAccount = null
+                    }
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        deletingAccount = null
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    accountDeleteMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = {
+                accountDeleteMessage = null
+            },
+            title = {
+                Text("Account removal")
+            },
+            text = {
+                Text(message)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        accountDeleteMessage = null
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        )
+    }
     deletingTransaction?.let { transaction ->
         ConfirmDeleteDialogV3(
             title = "Delete transaction?",
@@ -787,19 +840,21 @@ fun MoneyScreen(
 }
 
 @Composable
-private fun BalanceCardV3(
-    displayedBalance: Long,
+private fun BalanceCardV4(
+    displayedCash: Long,
     selectedAccount: Account?,
+    totalMoney: Long,
+    availableToSpend: Long,
+    protectedSavings: Long,
+    owedToMe: Long,
+    iOwe: Long,
     monthIncome: Long,
     monthExpense: Long,
     monthNet: Long,
     todayIncome: Long,
     todayExpense: Long,
-    accountTotalBalance: Long,
-    owedToMe: Long,
-    iOwe: Long,
     onToggleAccounts: () -> Unit
-){
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -808,50 +863,55 @@ private fun BalanceCardV3(
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
-                text = if (selectedAccount == null) {
-                    "Your total money"
-                } else {
-                    "${selectedAccount.name} balance"
-                },
+                text = "Your total money",
                 style = MaterialTheme.typography.labelLarge
             )
 
             Text(
-                text = formatMoney(displayedBalance),
+                text = formatMoney(totalMoney),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
 
-            if (selectedAccount == null) {
+            Text(
+                text = if (selectedAccount == null) {
+                    "Cash in accounts: ${formatMoney(displayedCash)}"
+                } else {
+                    "Cash in ${selectedAccount.name}: ${formatMoney(displayedCash)}"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 2.dp)
+            )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Accounts: ${formatMoney(accountTotalBalance)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                Text(
-                    text = "Owed to you: +${formatMoneyRaw(owedToMe)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-
-                Text(
-                    text = "You owe: -${formatMoneyRaw(iOwe)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                MetricColumn("Available", availableToSpend)
+                MetricColumn("Owed to me", owedToMe)
+                MetricColumn("I owe", iOwe, alignEnd = true)
             }
 
-
+            if (protectedSavings > 0L) {
+                Text(
+                    text = "Protected savings: ${formatMoney(protectedSavings)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
 
             Text(
                 text = "This month",
                 style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = 10.dp)
+                modifier = Modifier.padding(top = 12.dp)
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 MetricColumn("Income", monthIncome)
@@ -860,17 +920,13 @@ private fun BalanceCardV3(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Today: +${formatMoneyRaw(todayIncome)}",
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    text = "-${formatMoneyRaw(todayExpense)}",
-                    style = MaterialTheme.typography.labelSmall
-                )
+                Text("Today: +${formatMoneyRaw(todayIncome)}", style = MaterialTheme.typography.labelSmall)
+                Text("-${formatMoneyRaw(todayExpense)}", style = MaterialTheme.typography.labelSmall)
             }
 
             TextButton(onClick = onToggleAccounts) {
@@ -879,6 +935,7 @@ private fun BalanceCardV3(
         }
     }
 }
+
 
 @Composable
 private fun MetricColumn(
@@ -983,7 +1040,8 @@ private fun AccountCardV3(
     selected: Boolean,
     transactionCount: Int,
     onSelect: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -1034,7 +1092,146 @@ private fun AccountCardV3(
                     contentDescription = "Edit account"
                 )
             }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete account"
+                )
+            }
         }
+    }
+}
+
+
+@Composable
+private fun SavingsCardV4(
+    amountPaisa: Long,
+    sourceAccountName: String?,
+    onEdit: () -> Unit,
+    onClear: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Protected savings", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = if (amountPaisa > 0L) {
+                            "${formatMoney(amountPaisa)} • Source: ${sourceAccountName ?: "Not recorded"}"
+                        } else {
+                            "Nothing protected yet"
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit savings")
+                }
+            }
+
+            if (amountPaisa > 0L) {
+                TextButton(onClick = onClear) {
+                    Text("Remove protection")
+                }
+            } else {
+                TextButton(onClick = onEdit) {
+                    Text("Add savings")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SavingsDialogV4(
+    accounts: List<Account>,
+    initialAmountPaisa: Long,
+    initialSourceAccountId: Long?,
+    onDismiss: () -> Unit,
+    onSave: (Long, Long) -> Unit
+) {
+    var amount by remember(initialAmountPaisa) {
+        mutableStateOf(
+            if (initialAmountPaisa > 0L) {
+                String.format(Locale.getDefault(), "%.2f", initialAmountPaisa / 100.0)
+            } else {
+                ""
+            }
+        )
+    }
+
+    var sourceAccountId by remember(initialSourceAccountId) {
+        mutableStateOf(
+            initialSourceAccountId
+                ?: accounts.firstOrNull()?.id
+                ?: 0L
+        )
+    }
+
+    var showAccountPicker by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialAmountPaisa > 0L) "Edit savings" else "Add savings") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("Protected amount (NPR)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { showAccountPicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "Source account: " +
+                                (accounts.firstOrNull { it.id == sourceAccountId }?.name ?: "Select account")
+                    )
+                }
+
+                Text(
+                    text = "This does not change the account balance. It marks part of that money as protected.",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        },
+        confirmButton = {
+            val paisa = parseAmountToPaisa(amount)
+            Button(
+                onClick = {
+                    if (paisa > 0L && sourceAccountId > 0L) {
+                        onSave(paisa, sourceAccountId)
+                    }
+                },
+                enabled = paisa > 0L && sourceAccountId > 0L
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+
+    if (showAccountPicker) {
+        AccountPickerDialogV3(
+            accounts = accounts,
+            selectedAccountId = sourceAccountId,
+            onDismiss = { showAccountPicker = false },
+            onSelect = {
+                sourceAccountId = it
+                showAccountPicker = false
+            }
+        )
     }
 }
 
@@ -1069,8 +1266,9 @@ private fun DebtSummaryCardV3(
 }
 
 @Composable
-private fun DebtCardV3(
+private fun DebtCardV4(
     debt: Debt,
+    sourceAccountName: String?,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSettle: () -> Unit
@@ -1078,18 +1276,11 @@ private fun DebtCardV3(
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.People,
-                    contentDescription = null
-                )
-
+                Icon(Icons.Default.People, contentDescription = null)
                 Spacer(modifier = Modifier.size(8.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = debt.person,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text(debt.person, fontWeight = FontWeight.SemiBold)
                     Text(
                         text = if (debt.isOwedToMe) {
                             "Owes you • ${formatDate(debt.date)}"
@@ -1098,45 +1289,37 @@ private fun DebtCardV3(
                         },
                         style = MaterialTheme.typography.labelSmall
                     )
+                    Text(
+                        text = "Source: ${sourceAccountName ?: "Not recorded"}",
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
 
-                Text(
-                    text = formatMoney(debt.amountPaisa),
-                    fontWeight = FontWeight.Bold
-                )
+                Text(formatMoney(debt.amountPaisa), fontWeight = FontWeight.Bold)
             }
 
-            if (debt.note.isNotBlank()) {
+            val cleanNote = visibleDebtNote(debt.note)
+            if (cleanNote.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = debt.note,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(cleanNote, style = MaterialTheme.typography.bodySmall)
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onSettle) {
-                    Text("Settle")
-                }
+                TextButton(onClick = onSettle) { Text("Settle") }
                 IconButton(onClick = onEdit) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit debt"
-                    )
+                    Icon(Icons.Default.Edit, contentDescription = "Edit debt")
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete debt"
-                    )
+                    Icon(Icons.Default.Delete, contentDescription = "Delete debt")
                 }
             }
         }
     }
 }
+
 
 @Composable
 private fun TransactionCardV3(
@@ -1350,66 +1533,49 @@ private fun EmptyFilteredMoneyState(
 }
 
 @Composable
-private fun ActionChoiceDialogV3(
+private fun ActionChoiceDialogV4(
     onDismiss: () -> Unit,
     onTransaction: () -> Unit,
     onTransfer: () -> Unit,
     onDebt: () -> Unit,
-    onAccount: () -> Unit
+    onAccount: () -> Unit,
+    onSavings: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add to Money") },
         text = {
             Column {
-                Button(
-                    onClick = onTransaction,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Button(onClick = onTransaction, modifier = Modifier.fillMaxWidth()) {
                     Text("Income / Expense")
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = onTransfer,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SwapHoriz,
-                        contentDescription = null
-                    )
+                Button(onClick = onTransfer, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.SwapHoriz, contentDescription = null)
                     Spacer(modifier = Modifier.size(6.dp))
                     Text("Transfer between accounts")
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = onDebt,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Owe / Owed to me")
+                Button(onClick = onDebt, modifier = Modifier.fillMaxWidth()) {
+                    Text("Debt / Money owed")
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedButton(
-                    onClick = onAccount,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Button(onClick = onSavings, modifier = Modifier.fillMaxWidth()) {
+                    Text("Protected savings")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) {
                     Text("Add account")
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }
+
 
 @Composable
 private fun ConfirmDeleteDialogV3(
@@ -1458,7 +1624,9 @@ private fun AccountDialogV3(
     }
 
     val isNew = initial == null
-
+    var excludeFromTotal by remember(initial?.id) {
+        mutableStateOf(initial?.excludeFromTotal ?: false)
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1486,6 +1654,25 @@ private fun AccountDialogV3(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = excludeFromTotal,
+                        onCheckedChange = { excludeFromTotal = it }
+                    )
+
+                    Column {
+                        Text("Exclude from main total")
+                        Text(
+                            "Keep this account's balance separate from your main balance.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1494,10 +1681,12 @@ private fun AccountDialogV3(
                     onSave(
                         initial?.copy(
                             name = name.trim(),
-                            initialBalancePaisa = parseAmountToPaisa(opening)
+                            initialBalancePaisa = parseAmountToPaisa(opening),
+                            excludeFromTotal = excludeFromTotal
                         ) ?: Account(
                             name = name.trim(),
-                            initialBalancePaisa = parseAmountToPaisa(opening)
+                            initialBalancePaisa = parseAmountToPaisa(opening),
+                            excludeFromTotal = excludeFromTotal
                         ),
                         isNew
                     )
@@ -1660,14 +1849,14 @@ private fun TransactionDialogV3(
                     ) {
                         onSave(
                             MoneyTransaction(
-                                id = 0L,
+                                id = initial?.id ?: 0L,
                                 accountId = accountId,
                                 isIncome = isIncome,
                                 amountPaisa = paisa,
                                 category = category.trim(),
                                 note = note.trim(),
                                 date = date,
-                                createdAt = System.currentTimeMillis()
+                                createdAt = initial?.createdAt ?: System.currentTimeMillis()
                             )
                         )
                     }
@@ -2018,7 +2207,8 @@ private fun TransferDialogV3(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DebtDialogV3(
+private fun DebtDialogV4(
+    accounts: List<Account>,
     initial: Debt?,
     onDismiss: () -> Unit,
     onSave: (Debt) -> Unit
@@ -2040,7 +2230,15 @@ private fun DebtDialogV3(
     }
 
     var note by remember(initial?.id) {
-        mutableStateOf(initial?.note ?: "")
+        mutableStateOf(visibleDebtNote(initial?.note.orEmpty()))
+    }
+
+    var sourceAccountId by remember(initial?.id) {
+        mutableStateOf(
+            debtSourceAccountId(initial?.note.orEmpty())
+                ?: accounts.firstOrNull()?.id
+                ?: 0L
+        )
     }
 
     var date by remember(initial?.id) {
@@ -2048,14 +2246,19 @@ private fun DebtDialogV3(
     }
 
     var showDatePicker by remember { mutableStateOf(false) }
+    var showAccountPicker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(if (initial == null) "Add owe record" else "Edit owe record")
-        },
+        title = { Text(if (initial == null) "Add debt" else "Edit debt") },
         text = {
             Column {
+                Text(
+                    text = "Debt type",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -2088,6 +2291,28 @@ private fun DebtDialogV3(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                OutlinedButton(
+                    onClick = { showAccountPicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "Source account: " +
+                                (accounts.firstOrNull { it.id == sourceAccountId }?.name ?: "Select account")
+                    )
+                }
+
+                Text(
+                    text = if (isOwedToMe) {
+                        "Money was given from this account."
+                    } else {
+                        "Borrowed money is associated with this account."
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -2107,17 +2332,18 @@ private fun DebtDialogV3(
             }
         },
         confirmButton = {
+            val paisa = parseAmountToPaisa(amount)
             Button(
                 onClick = {
-                    val paisa = parseAmountToPaisa(amount)
-                    if (paisa > 0L && person.isNotBlank()) {
+                    if (paisa > 0L && person.isNotBlank() && sourceAccountId > 0L) {
+                        val storedNote = encodeDebtNote(sourceAccountId, note.trim())
                         onSave(
                             Debt(
                                 id = initial?.id ?: 0L,
                                 person = person.trim(),
                                 amountPaisa = paisa,
                                 isOwedToMe = isOwedToMe,
-                                note = note.trim(),
+                                note = storedNote,
                                 date = date,
                                 isSettled = initial?.isSettled ?: false,
                                 createdAt = initial?.createdAt ?: System.currentTimeMillis()
@@ -2125,47 +2351,47 @@ private fun DebtDialogV3(
                         )
                     }
                 },
-                enabled =
-                    parseAmountToPaisa(amount) > 0L &&
-                            person.isNotBlank()
+                enabled = paisa > 0L && person.isNotBlank() && sourceAccountId > 0L
             ) {
-                Text(if (initial == null) "Add owe" else "Save changes")
+                Text(if (initial == null) "Add debt" else "Save changes")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 
-    if (showDatePicker) {
-        val state = rememberDatePickerState(
-            initialSelectedDateMillis = date
+    if (showAccountPicker) {
+        AccountPickerDialogV3(
+            accounts = accounts,
+            selectedAccountId = sourceAccountId,
+            onDismiss = { showAccountPicker = false },
+            onSelect = {
+                sourceAccountId = it
+                showAccountPicker = false
+            }
         )
+    }
 
+    if (showDatePicker) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = date)
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        state.selectedDateMillis?.let { date = it }
-                        showDatePicker = false
-                    }
-                ) {
-                    Text("Select")
-                }
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { date = it }
+                    showDatePicker = false
+                }) { Text("Select") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
             }
         ) {
             DatePicker(state = state)
         }
     }
 }
+
 
 @Composable
 private fun DebtSettlementDialog(
@@ -2249,6 +2475,28 @@ private fun DebtSettlementDialog(
             }
         }
     )
+}
+
+private const val DEBT_SOURCE_PREFIX = "__KINGZ_SRC__"
+
+private fun encodeDebtNote(sourceAccountId: Long, note: String): String {
+    val clean = note.trim()
+    return "$DEBT_SOURCE_PREFIX$sourceAccountId|$clean"
+}
+
+private fun debtSourceAccountId(note: String): Long? {
+    if (!note.startsWith(DEBT_SOURCE_PREFIX)) return null
+
+    return note
+        .removePrefix(DEBT_SOURCE_PREFIX)
+        .substringBefore('|')
+        .toLongOrNull()
+}
+
+private fun visibleDebtNote(note: String): String {
+    if (!note.startsWith(DEBT_SOURCE_PREFIX)) return note
+
+    return note.substringAfter('|', "").trim()
 }
 
 private fun parseAmountToPaisa(value: String): Long {
