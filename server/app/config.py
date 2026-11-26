@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    FILE_STORAGE_ROOT: str = "/mnt/kingz-data/files"
+    MAX_FILE_SIZE_BYTES: int = 104857600
 
     model_config = SettingsConfigDict(
         env_file=".env",

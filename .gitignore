@@ -21,3 +21,10 @@ server/storage/
 .DS_Store
 Thumbs.db
 *.log
+
+# ===== Local backups and IDE files =====
+*.bak
+server/backups/
+.idea/
+
+*.before_sharing

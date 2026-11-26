@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-
 from app.database import Base
 
 
@@ -18,12 +17,6 @@ class Session(Base):
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    )
-
-    device_id: Mapped[int] = mapped_column(
-        ForeignKey("devices.id", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )

@@ -20,10 +20,7 @@ database_url = URL.create(
     database=settings.POSTGRES_DB,
 )
 
-engine = create_engine(
-    database_url,
-    pool_pre_ping=True,
-)
+engine = create_engine(database_url, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(
     bind=engine,
@@ -34,7 +31,6 @@ SessionLocal = sessionmaker(
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
-
     try:
         yield db
     finally:
@@ -47,6 +43,6 @@ def test_database_connection() -> None:
 
 
 def init_db() -> None:
-    from app.models import User  # noqa: F401
+    from app.models import User, Session as UserSession, Folder, GalleryFile
 
     Base.metadata.create_all(bind=engine)
