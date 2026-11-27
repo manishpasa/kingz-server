@@ -27,6 +27,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material.icons.filled.TaskAlt
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -86,16 +93,16 @@ class MainActivity : ComponentActivity() {
 
 data class AppModule(
     val name: String,
-    val symbol: String,
+    val icon: ImageVector,
     val description: String
 )
 
 private val modules = listOf(
-    AppModule("Tasks", "✓", "Manage your tasks"),
-    AppModule("Money", "₨", "Track your money"),
-    AppModule("Notes", "✎", "Quick notes"),
-    AppModule("Data", "◉", "Mobile data usage"),
-    AppModule("KinGz Server", "▣", "Your private server and files")
+    AppModule("Tasks", Icons.Filled.TaskAlt, "Manage your tasks"),
+    AppModule("Money", Icons.Filled.AccountBalanceWallet, "Track your money"),
+    AppModule("Notes", Icons.Filled.StickyNote2, "Quick notes"),
+    AppModule("Data", Icons.Filled.DataUsage, "Mobile data usage"),
+    AppModule("KinGz Server", Icons.Filled.Cloud, "Your private server and files")
 )
 
 @Composable
@@ -224,7 +231,7 @@ fun KinGzApp() {
         }
 
         "file-storage" -> {
-            FileStorageScreen(
+            FileStorageContent(
                 onBack = { currentScreen = "server" }
             )
         }
@@ -329,7 +336,7 @@ private fun ServerHomeScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         TextButton(onClick = onBack) {
-            Text("← Back to dashboard")
+            Text("ΓåÉ Back to dashboard")
         }
 
         Text(
@@ -397,32 +404,6 @@ private fun ServerHomeScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun FileStorageScreen(
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        TextButton(onClick = onBack) {
-            Text("← Back to KinGz Server")
-        }
-
-        Text(
-            text = "File Storage",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "The file-storage destination is ready. The next step is connecting it to the server's file API so you can browse, upload, download, and retrieve files."
-        )
     }
 }
 
@@ -507,7 +488,7 @@ fun Dashboard(
                     onModuleClick(
                         AppModule(
                             name = "Tasks",
-                            symbol = "✓",
+                            icon = Icons.Filled.TaskAlt,
                             description = "Manage your tasks"
                         )
                     )
@@ -576,11 +557,7 @@ fun TodayCard(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "✓",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Icon(imageVector = Icons.Filled.TaskAlt, contentDescription = "Today tasks", modifier = Modifier.size(30.dp))
                 }
 
                 Spacer(modifier = Modifier.width(14.dp))
@@ -601,10 +578,7 @@ fun TodayCard(
                     )
                 }
 
-                Text(
-                    text = "→",
-                    style = MaterialTheme.typography.titleLarge
-                )
+                Icon(imageVector = Icons.Filled.ArrowForward, contentDescription = "View tasks")
             }
 
             if (todayTasks.isNotEmpty()) {
@@ -736,11 +710,7 @@ fun ModuleCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = module.symbol,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Icon(imageVector = module.icon, contentDescription = module.name, modifier = Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
             }
 
             Spacer(modifier = Modifier.height(10.dp))

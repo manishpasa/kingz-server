@@ -170,6 +170,7 @@ def list_folders(
             "is_public": f.is_public,
             "owner_id": f.owner_id,
             "is_owner": f.owner_id == user.id,
+            "created_at": f.created_at,
         }
         for f in folders
     ]
@@ -292,6 +293,7 @@ def upload_file(
         "content_type": item.content_type,
         "size_bytes": item.size_bytes,
         "owner_id": item.owner_id,
+        "created_at": item.created_at,
     }
 
 
@@ -309,7 +311,7 @@ def list_files(
 
     items = db.scalars(
         select(GalleryFile).where(condition)
-        .order_by(GalleryFile.original_name)
+        .order_by(GalleryFile.created_at.desc())
     ).all()
 
     return [
@@ -321,11 +323,37 @@ def list_files(
             "size_bytes": f.size_bytes,
             "owner_id": f.owner_id,
             "is_owner": f.owner_id == user.id,
+            "created_at": f.created_at,
         }
         for f in items
     ]
 
 
+
+@router.get("/gallery")
+def list_gallery_files(
+    user: User = Depends(get_current_user),
+    db: DbSession = Depends(get_db),
+):
+    items = db.scalars(
+        select(GalleryFile)
+        .where(GalleryFile.owner_id == user.id)
+        .order_by(GalleryFile.created_at.desc())
+    ).all()
+
+    return [
+        {
+            "id": item.id,
+            "name": item.original_name,
+            "folder_id": item.folder_id,
+            "content_type": item.content_type,
+            "size_bytes": item.size_bytes,
+            "owner_id": item.owner_id,
+            "is_owner": True,
+            "created_at": item.created_at,
+        }
+        for item in items
+    ]
 @router.get("/{file_id}/download")
 def download_file(
     file_id: int,
